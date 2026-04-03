@@ -99,7 +99,7 @@ const Physics = (() => {
         const r = resolveAABB(body, stat);
         if (!r) continue;
 
-        body.y -= r.dy;
+        body.y += r.dy;
 
         if (r.side === 'top') {
           // Landing on platform
