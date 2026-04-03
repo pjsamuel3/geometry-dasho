@@ -57,21 +57,24 @@ const Physics = (() => {
     return body;
   }
 
-  /** Resolve AABB overlap: returns { dx, dy, side } */
+  /**
+   * One-way top-only collision: only resolves when the dynamic body is
+   * above the static body's midline and moving downward.
+   * This prevents the player from getting wedged against platform sides.
+   */
   function resolveAABB(dyn, stat) {
     const overlapX = Math.min(dyn.right, stat.right) - Math.max(dyn.left, stat.left);
     const overlapY = Math.min(dyn.top, stat.top)     - Math.max(dyn.bottom, stat.bottom);
     if (overlapX <= SKIN_W || overlapY <= SKIN_W) return null;
 
-    if (overlapX < overlapY) {
-      // Horizontal resolution
-      const dir = dyn.x < stat.x ? -1 : 1;
-      return { dx: overlapX * dir, dy: 0, side: dir < 0 ? 'left' : 'right' };
-    } else {
-      // Vertical resolution
-      const dir = dyn.y < stat.y ? -1 : 1;
-      return { dx: 0, dy: overlapY * dir, side: dir < 0 ? 'bottom' : 'top' };
+    // Only land on the top surface — never collide with sides or bottom.
+    // dyn.y > stat.y: player centre is above the platform body's centre
+    // (all platforms store their body centre at y = platformTop - halfHeight),
+    // so this condition is true whenever the player arrives from above.
+    if (dyn.y > stat.y && dyn.vy <= 0) {
+      return { dy: overlapY, side: 'top' };
     }
+    return null;
   }
 
   function step(dt) {
@@ -96,19 +99,12 @@ const Physics = (() => {
         const r = resolveAABB(body, stat);
         if (!r) continue;
 
-        body.x -= r.dx;
         body.y -= r.dy;
 
         if (r.side === 'top') {
           // Landing on platform
           if (body.vy < 0) body.vy = 0;
           body.onGround = true;
-        } else if (r.side === 'bottom') {
-          // Hit ceiling
-          if (body.vy > 0) body.vy = 0;
-        } else {
-          // Side hit — zero horizontal velocity
-          body.vx = 0;
         }
       }
 

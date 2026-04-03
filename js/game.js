@@ -14,7 +14,6 @@
   const LIVES_START   =   3;
   const PLAYER_START_X = -4;
   const PLAYER_START_Y =  2;
-  const SPIKE_RADIUS  =  0.42;   // approx collision radius for spike tips
   const PORTAL_RADIUS =  1.5;
 
   // ── Three.js Scene Setup ───────────────────────────────────────────────
@@ -157,9 +156,11 @@
     group.castShadow = true;
     scene.add(group);
 
-    // Store tip position for collision check
-    group.userData.tipX = x;
-    group.userData.tipY = y + 0.075 + 0.36 + 0.30 + 0.24 - 0.05;
+    // Store tip position for AABB collision
+    group.userData.tipX  = x;
+    group.userData.baseY = y;           // platform surface level (spike sits on top)
+    group.userData.tipY  = y + 0.925;   // approximate tip height
+    group.userData.halfW = 0.25;        // half-width of collision box
     spikeMeshes.push(group);
   }
 
@@ -285,11 +286,18 @@
     const px = playerBody.x;
     const py = playerBody.y;
 
-    // Spikes
+    // Spikes — AABB overlap check (player must jump over, not run through)
+    const pLeft   = px - playerBody.hw;
+    const pRight  = px + playerBody.hw;
+    const pBottom = py - playerBody.hh;
+    const pTop    = py + playerBody.hh;
+
     for (const spike of spikeMeshes) {
-      const dx = Math.abs(px - spike.userData.tipX);
-      const dy = Math.abs(py - spike.userData.tipY);
-      if (dx < SPIKE_RADIUS && dy < SPIKE_RADIUS + 0.25) {
+      const sLeft  = spike.userData.tipX - spike.userData.halfW;
+      const sRight = spike.userData.tipX + spike.userData.halfW;
+      const sBot   = spike.userData.baseY;
+      const sTop   = spike.userData.tipY;
+      if (pRight > sLeft && pLeft < sRight && pTop > sBot && pBottom < sTop) {
         hitSpike();
         return;
       }
@@ -407,9 +415,8 @@
     if (jumpCooldown  > 0) jumpCooldown  -= delta;
 
     // ── Horizontal movement ────────────────────────────────────────────
-    const runDir   = Controls.left ? -1 : 1;
-    const runSpeed = isFlying ? lvl.runSpeed * 0.85 : lvl.runSpeed;
-    playerBody.vx  = runDir * runSpeed;
+    // Always auto-run right (Geometry Dash style — no left control)
+    playerBody.vx = isFlying ? lvl.runSpeed * 0.85 : lvl.runSpeed;
 
     // ── Jump / Flap ────────────────────────────────────────────────────
     if (Controls.jump && jumpCooldown <= 0) {
