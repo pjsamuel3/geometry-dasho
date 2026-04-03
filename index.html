@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Geometry Dasho — Mummy's Run</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0a0a14;
+      overflow: hidden;
+      font-family: 'Segoe UI', Arial, sans-serif;
+      touch-action: none;
+    }
+
+    #game-canvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ── HUD ── */
+    #hud {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      padding: 10px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .hud-item {
+      color: #fff;
+      font-size: 18px;
+      font-weight: bold;
+      text-shadow: 0 0 6px #000, 0 0 12px #000;
+    }
+
+    #lives-display { color: #ff6b6b; font-size: 20px; }
+    #mode-display  { color: #7efff5; font-size: 16px; letter-spacing: 1px; }
+
+    /* ── OVERLAY SCREENS ── */
+    .screen {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      background: rgba(0,0,0,0.82);
+      color: #fff;
+    }
+
+    .screen h1 {
+      font-size: clamp(28px, 7vw, 52px);
+      text-align: center;
+      color: #ffe68a;
+      text-shadow: 0 0 20px #c9a000;
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+
+    .screen p {
+      font-size: clamp(14px, 3.5vw, 20px);
+      color: #ccc;
+      text-align: center;
+      max-width: 400px;
+      margin: 8px auto;
+    }
+
+    .big-btn {
+      margin-top: 28px;
+      padding: 16px 48px;
+      font-size: clamp(18px, 4vw, 26px);
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(145deg, #ffe068, #c98b00);
+      color: #3a2000;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(200,140,0,0.6);
+      transition: transform .12s, box-shadow .12s;
+    }
+
+    .big-btn:active { transform: scale(.95); }
+
+    .emoji-title { font-size: clamp(50px, 12vw, 90px); }
+
+    #level-banner {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: rgba(0,0,0,0.85);
+      border: 3px solid #ffe068;
+      border-radius: 16px;
+      padding: 24px 48px;
+      color: #ffe068;
+      font-size: clamp(22px, 5vw, 38px);
+      font-weight: bold;
+      text-align: center;
+      z-index: 30;
+      transition: transform .35s cubic-bezier(.34,1.56,.64,1);
+      pointer-events: none;
+    }
+
+    #level-banner.show { transform: translate(-50%, -50%) scale(1); }
+
+    /* ── TOUCH CONTROLS ── */
+    #controls {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      height: 130px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding: 0 20px 20px;
+      z-index: 15;
+      pointer-events: none;
+    }
+
+    .ctrl-btn {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: 3px solid rgba(255,255,255,0.3);
+      background: rgba(255,255,255,0.12);
+      backdrop-filter: blur(4px);
+      color: #fff;
+      font-size: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      pointer-events: all;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: background .1s;
+      text-shadow: 0 0 8px rgba(255,255,255,0.6);
+    }
+
+    .ctrl-btn:active,
+    .ctrl-btn.pressed {
+      background: rgba(255,220,80,0.35);
+      border-color: rgba(255,220,80,0.7);
+    }
+
+    #btn-jump { background: rgba(255,200,40,0.18); }
+    #btn-left { background: rgba(100,200,255,0.12); }
+
+    /* ── FLYING MODE INDICATOR ── */
+    #fly-indicator {
+      position: fixed;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 20px;
+      border-radius: 20px;
+      background: rgba(100,255,240,0.2);
+      border: 2px solid #7efff5;
+      color: #7efff5;
+      font-size: 14px;
+      font-weight: bold;
+      letter-spacing: 2px;
+      z-index: 11;
+      opacity: 0;
+      transition: opacity .4s;
+      pointer-events: none;
+    }
+
+    #fly-indicator.visible { opacity: 1; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- Canvas -->
+<canvas id="game-canvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-item" id="level-display">LEVEL 1</div>
+  <div class="hud-item" id="mode-display"></div>
+  <div class="hud-item" id="lives-display">❤️❤️❤️</div>
+</div>
+
+<div id="fly-indicator">✈ FLYING MODE</div>
+
+<!-- Level banner -->
+<div id="level-banner"></div>
+
+<!-- Touch Controls -->
+<div id="controls">
+  <div class="ctrl-btn" id="btn-left">⬅</div>
+  <div class="ctrl-btn" id="btn-jump">🦘</div>
+</div>
+
+<!-- Menu Screen -->
+<div class="screen" id="screen-menu">
+  <div class="emoji-title">🧟</div>
+  <h1>Mummy's Run</h1>
+  <p>Jump over spikes, fly through portals, escape the tomb!</p>
+  <button class="big-btn" id="btn-start">▶ START GAME</button>
+  <p style="margin-top:20px; font-size:13px; color:#888;">Tap JUMP to hop &bull; Find the portal to fly!</p>
+</div>
+
+<!-- Level Complete Screen -->
+<div class="screen hidden" id="screen-level-complete">
+  <div class="emoji-title">🏆</div>
+  <h1>Level Complete!</h1>
+  <p id="complete-msg">Great jumping!</p>
+  <button class="big-btn" id="btn-next-level">Next Level ➡</button>
+</div>
+
+<!-- Game Over Screen -->
+<div class="screen hidden" id="screen-game-over">
+  <div class="emoji-title">💀</div>
+  <h1>Oh no!</h1>
+  <p>The spikes got you...</p>
+  <button class="big-btn" id="btn-retry">Try Again 🔄</button>
+  <button class="big-btn" style="margin-top:12px; background:linear-gradient(145deg,#888,#444); color:#fff; box-shadow:none;" id="btn-menu">Main Menu</button>
+</div>
+
+<!-- Win Screen -->
+<div class="screen hidden" id="screen-win">
+  <div class="emoji-title">🎉</div>
+  <h1>You Escaped!</h1>
+  <p>The mummy is FREE! All 3 levels conquered.</p>
+  <button class="big-btn" id="btn-play-again">Play Again 🔄</button>
+</div>
+
+<!-- Three.js (vendored local copy) -->
+<script src="vendor/three.min.js"></script>
+
+<!-- Game modules -->
+<script src="js/controls.js"></script>
+<script src="js/physics.js"></script>
+<script src="js/levels.js"></script>
+<script src="js/player.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+
+</body>
+</html>
